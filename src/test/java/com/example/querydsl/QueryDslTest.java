@@ -2,6 +2,7 @@ package com.example.querydsl;
 
 import com.example.querydsl.entity.Member;
 import com.example.querydsl.entity.Team;
+import com.querydsl.core.Tuple;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -9,6 +10,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 import javax.persistence.EntityManager;
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 import static com.example.querydsl.entity.QMember.member;
@@ -101,4 +104,90 @@ public class QueryDslTest {
 		assertThat(findMember.getUsername()).isEqualTo("member1");
 	}
 
+	@Test
+	public void sort() {
+		em.persist(new Member(null, 100));
+		em.persist(new Member("member5", 100));
+		em.persist(new Member("member6", 100));
+
+		List<Member> result = queryFactory
+				.selectFrom(member)
+				// age가 100인 회원들 중
+				.where(member.age.eq(100))
+				// 나이로 내림차순 -> 나이 같다면 이름으로 오름차순
+				// nullsLast : 이름 없는 회원 맨 마지막에 출력
+				.orderBy(member.age.desc(), member.username.asc().nullsLast())
+				// fetch : 리스트 조회, 데이터 없으면 빈 리스트 반한
+				// fetchOne : 하나 조회. 결과 2개 이상이면 NonUniqueResultException
+				.fetch();
+
+		Member member5 = result.get(0);
+		Member member6 = result.get(1);
+		Member memberNull = result.get(2);
+
+		assertThat(member5.getUsername()).isEqualTo("member5");
+		assertThat(member6.getUsername()).isEqualTo("member6");
+		assertThat(memberNull.getUsername()).isNull();
+	}
+
+
+	// 페이징
+	@Test
+	public void paging() {
+		List<Member> result = queryFactory
+				.selectFrom(member)
+				.orderBy(member.username.desc())
+				// offset으로 시작 index 알리고
+				.offset(1)
+				// limit으로 가져올 결과물 수 제한
+				.limit(2)
+				.fetch();
+
+		for (Member member : result) {
+			System.out.println("member = " + member.getUsername());
+		}
+
+		assertThat(result.size()).isEqualTo(2);
+	}
+
+	@Test
+	public void aggregation() {
+		List<Tuple> result = queryFactory
+				.select(member.count(),
+						member.age.sum(),
+						member.age.avg(),
+						member.age.max(),
+						member.age.min()
+				)
+				.from(member)
+				.fetch();
+
+		Tuple tuple = result.get(0);
+		assertThat(tuple.get(member.count())).isEqualTo(4);
+		assertThat(tuple.get(member.age.sum())).isEqualTo(100);
+		assertThat(tuple.get(member.age.max())).isEqualTo(40);
+		assertThat(tuple.get(member.age.min())).isEqualTo(10);
+	}
+
+	@Test
+	public void group() {
+		List<Tuple> result = queryFactory
+				.select(team.name, member.age.avg())
+				.from(member)
+				.join(member.team, team)
+				.groupBy(team.name)
+				.fetch();
+
+		Tuple teamA = result.get(0);
+		System.out.println("!!!!!!! teamA.get(team.name) = " + teamA.get(team.name));
+		System.out.println("!!!!!!! teamA.get(member.age.avg()) = " + teamA.get(member.age.avg()));
+
+		Tuple teamB = result.get(1);
+
+		assertThat(teamA.get(team.name)).isEqualTo("teamA");
+		assertThat(teamA.get(member.age.avg())).isEqualTo(15);
+
+		assertThat(teamB.get(team.name)).isEqualTo("teamB");
+		assertThat(teamB.get(member.age.avg())).isEqualTo(35);
+	}
 }
