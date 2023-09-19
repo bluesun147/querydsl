@@ -1,6 +1,5 @@
-package com.example.querydsl.team;
+package com.example.querydsl.entity;
 
-import com.example.querydsl.member.Member;
 import lombok.*;
 
 import javax.persistence.Entity;
@@ -19,6 +18,7 @@ public class Team {
     @GeneratedValue
     private Long id;
     private String name;
+
     @OneToMany(mappedBy = "team")
     private List<Member> members = new ArrayList<>();
 

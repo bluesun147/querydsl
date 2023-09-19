@@ -1,6 +1,5 @@
-package com.example.querydsl.member;
+package com.example.querydsl.entity;
 
-import com.example.querydsl.team.Team;
 import lombok.*;
 
 import javax.persistence.*;
