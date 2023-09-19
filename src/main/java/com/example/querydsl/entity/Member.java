@@ -5,6 +5,7 @@ import lombok.*;
 import javax.persistence.*;
 
 /*
+gradle > tasks > other > compileQueryDsl
 build/generated/querydsl에 Q클래스가 생성된 것을 확인할 수 있다
 querydsl 이 q-class 사용하는 이유는?
 MetaClass인 Q-Class 라는것을 만드는 이유 :
