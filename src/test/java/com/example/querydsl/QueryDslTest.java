@@ -1,8 +1,10 @@
 package com.example.querydsl;
 
+import com.example.querydsl.dto.MemberDto;
 import com.example.querydsl.entity.Member;
 import com.example.querydsl.entity.Team;
 import com.querydsl.core.Tuple;
+import com.querydsl.core.types.Projections;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,8 +12,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 import javax.persistence.EntityManager;
+import javax.persistence.EntityManagerFactory;
+import javax.persistence.PersistenceUnit;
 import java.util.List;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 import static com.example.querydsl.entity.QMember.member;
@@ -189,5 +192,78 @@ public class QueryDslTest {
 
 		assertThat(teamB.get(team.name)).isEqualTo("teamB");
 		assertThat(teamB.get(member.age.avg())).isEqualTo(35);
+	}
+
+	// 기본 조인
+	// 첫번째 파라미터에 조인 대상 저장, 두번째 파라미텅 별칭 (alias)
+	// join(조인 대상, 별칭으로 사용할 Q 타입)
+	@Test
+	public void join() {
+		List<Member> result = queryFactory
+				.selectFrom(member)
+				.join(member.team, team)
+				.where(team.name.eq("teamA"))
+				.fetch();
+
+		assertThat(result)
+				.extracting("username")
+				.containsExactly("member1", "member2");
+	}
+
+	// @Autowired와 다른점은 스프링 의존도가 없는 순수한 JPA 코드라는 점
+	// javaEE 컨테이너에서 EntityManagerFactory 제공받아 사용하는 전형적인 JPA 코드
+	// https://milenote.tistory.com/171
+	@PersistenceUnit
+	EntityManagerFactory emf;
+	@Test
+	public void fetchJoinNo() {
+		em.flush();
+		em.clear();
+
+		Member findMember = queryFactory
+				.selectFrom(member)
+				//fetch join 없음
+				.where(member.username.eq("member1"))
+				.fetchOne();
+
+		// team 필드를 lazy로 설정해두면 member.getTeam 호출하지 않는 이상
+		// team을 조회하는 select문이 db에 전달되지 않음.
+
+		// 해당 엔티티가 로딩되어있는지 확인시켜주는 기능
+		// mem1 이라는 이름 가진 유저 찾고 그 유저로 getTeam() 호출 했을 때 로딩 되었는지 테스트 하는 코드
+		// getTeam 해도 아무것도 없다는 말
+		boolean loaded =
+				emf.getPersistenceUnitUtil().isLoaded(findMember.getTeam());
+		assertThat(loaded).as("패치 조인 미적용").isFalse();
+	}
+
+	// fetch join 사용
+	@Test
+	public void fetchJoinUse() {
+		em.flush();
+		em.clear();
+
+		Member findMember = queryFactory
+				.selectFrom(member)
+				.join(member.team, team).fetchJoin()
+				.where(member.username.eq("member1"))
+				.fetchOne();
+
+		boolean loaded =
+				emf.getPersistenceUnitUtil().isLoaded(findMember.getTeam());
+		assertThat(loaded).as("패치 조인 적용").isTrue();
+	}
+
+	// 프로젝션 대상이 하나인 경우
+	@Test
+	public void simpleProjection() {
+		List<String> result = queryFactory
+				.select(member.username)
+				.from(member)
+				.fetch();
+
+		for(String s : result) {
+			System.out.println("s = " + s);
+		}
 	}
 }
