@@ -358,5 +358,126 @@ public class QueryDslTest {
 			System.out.println("!!!!! memberDto = " + memberDto);
 		}
 	}
+
+	// 동적 쿼리
+	// 동적 쿼리 BooleanBuilder 사용
+	// 쿼리의 조건 설정인 where 뒤의 조건 생성해주는 것
+	// 원하는 조건을 다 넣은 후 queryFactory.where 절에 해당 builder를 넣어주면 조건문 완성
+	private List<Member> searchMember(String usernameCond, Integer ageCond) {
+		BooleanBuilder builder = new BooleanBuilder();
+		if (usernameCond != null) {
+			builder.and(member.username.eq(usernameCond));
+		}
+
+		if (ageCond != null) {
+			builder.and(member.age.eq(ageCond));
+		}
+
+		return queryFactory
+				.selectFrom(member)
+				.where(builder)
+				.fetch();
+	}
+
+	// 원하는 조건을 다 넣은 뒤 queryFactory.where 절에 해당 builder를 넣으면 조건문 완성
+	@Test
+	public void dynamicQuery_BooleanBuilder() {
+
+		String userParam = "member1";
+		Integer ageParam = 10;
+
+		// 파라미터로 넣기
+		List<Member> result = searchMember(userParam, ageParam);
+
+		// 1명 밖에 없음
+		assertThat(result.size()).isEqualTo(1);
+	}
+
+	// where 다중 파라미터 사용하면 메서드들을 다른 쿼리에서도 재활용 가능, 쿼리 자체의 가독성 높아짐
+	@Test
+	public void dynamicQuery_WhereParam() {
+		String usernameParam = "member1";
+		Integer ageParam = 10;
+
+		List<Member> result = searchMemberWithWhere(usernameParam, ageParam);
+
+		for (Member memberX : result) {
+			System.out.println("!!!!! memberX = " + memberX);
+		}
+
+		assertThat(result.size()).isEqualTo(1);
+	}
+
+	private List<Member> searchMemberWithWhere(String usernameCond, Integer ageCond) {
+		return queryFactory
+				.selectFrom(member)
+				.where(usernameEq(usernameCond), ageEq(ageCond))
+//				.where(allEq(usernameCond, ageCond))
+				.fetch();
+	}
+
+	private BooleanExpression usernameEq(String usernameCond) {
+		if (usernameCond == null) {
+			return null;
+		}
+		return member.username.eq(usernameCond);
+	}
+
+	private BooleanExpression ageEq(Integer ageCond) {
+		if (ageCond == null) {
+			return null;
+		}
+		return member.age.eq(ageCond);
+	}
+
+	private BooleanExpression allEq(String usernameCond, Integer ageCond) {
+		return usernameEq(usernameCond).and(ageEq(ageCond));
+	}
+
+	// 리턴값이 null 일 때 쿼리dsl은 자동으로 해당 값 무시하므로 동적 쿼리 존재
+
+	// jpa에는 update 따로 메소드 없고 dirty checking(변경 감지) 통해 수정 진행
+	// 더티 체킹은 건별로 업데이트 진행하기 때문에 한번에 업데이트하는 로직은 bulk 연산 사용이 좋다
+
+
+	// 28살보다 작은 회원들의 이름을 "비회원"으로 수정
+	@Test
+	public void bulkUpdate() {
+		long count = queryFactory
+				.update(member)
+				.set(member.username, "비회원")
+				.where(member.age.lt(28))
+				.execute();
+
+		// jpa는 기본적으로 트랜잭션 끝나기 전까지 영속성 컨텍스트에 쿼리문 쌓아 놓았다가 끝남과 동시에 DB에 전달
+		// 하지만 벌크 연산은 db에 바로 전달
+		em.flush();
+		em.clear();
+	}
+
+	/*
+	업데이트 후 다시 db에서 조회하는 로직 추가된다면?
+	여전히 바뀌지 않음 -> 영속성 컨텍스트와 db값 불일치 현상 때문.
+	벌크 연산 통해 db값은 바로 바뀌고, 영속성 컨텍스트는 이전의 값 남아있는 불일치 현상 해결 위해
+	영속성 컨텍스트 모두 초기화 시켜주는 em.flush()와 em.clear() 들어간 이유
+	 */
+
+	// 모든 회원의 나이 1씩 더하는 로직
+	// 빼기는 -1 넣으면 됨
+	@Test
+	public void bulkAdd() {
+		long count = queryFactory
+				.update(member)
+				.set(member.age, member.age.add(1))
+				.execute();
+	}
+
+	@Test
+	public void bulkDelete() {
+		long count = queryFactory
+				.delete(member)
+				.where(member.age.gt(18))
+				.execute();
+	}
 }
 
