@@ -1,10 +1,9 @@
 package com.example.querydsl;
 
-import com.example.querydsl.dto.MemberDto;
-import com.example.querydsl.dto.QMemberDto;
-import com.example.querydsl.dto.UserDto;
+import com.example.querydsl.dto.*;
 import com.example.querydsl.entity.Member;
 import com.example.querydsl.entity.Team;
+import com.example.querydsl.repository.MemberRepository;
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.Projections;
@@ -479,5 +478,23 @@ public class QueryDslTest {
 				.where(member.age.gt(18))
 				.execute();
 	}
-}
 
+	// 리포지토리 적용
+	@Autowired
+	MemberRepository memberRepository;
+
+	@Test
+	public void repositoryTest() {
+		Member member = new Member("member3", 60);
+		memberRepository.save(member);
+
+//		List<Member> result = memberRepository.findAll_queryDsl();
+//		assertThat(result).containsExactly(member);
+
+		List<Member> result2 = memberRepository.findByname_queryDsl("member3");
+		for (Member m : result2) {
+			System.out.println("!!!!!!!!!!!!!!!!!!!!!! m = " + m);
+		}
+		assertThat(result2).contains(member);
+	}
+}
