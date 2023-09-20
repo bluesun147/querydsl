@@ -497,4 +497,23 @@ public class QueryDslTest {
 		}
 		assertThat(result2).contains(member);
 	}
+
+	// build, where 패턴 테스트
+	@Test
+	public void searchTest() {
+		MemberSearchCondition condition = new MemberSearchCondition();
+		condition.setAgeGoe(35);
+		condition.setAgeLoe(40);
+		condition.setTeamName("teamB");
+
+		List<MemberTeamDto> result =
+				memberRepository.searchByBuilder(condition);
+
+		System.out.println("!!!!!!!!!!!!!! result.size is " + result.size());
+		for (MemberTeamDto m : result) {
+			System.out.println("!!!!!!!!!!!!!! m = " + m);
+		}
+
+		assertThat(result).extracting("username").contains("member4");
+	}
 }
