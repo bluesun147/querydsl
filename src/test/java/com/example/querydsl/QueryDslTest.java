@@ -1,10 +1,14 @@
 package com.example.querydsl;
 
 import com.example.querydsl.dto.MemberDto;
+import com.example.querydsl.dto.QMemberDto;
+import com.example.querydsl.dto.UserDto;
 import com.example.querydsl.entity.Member;
 import com.example.querydsl.entity.Team;
+import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.Projections;
+import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -266,4 +270,93 @@ public class QueryDslTest {
 			System.out.println("s = " + s);
 		}
 	}
+
+	// jqpl 활용한 DTO 반환 방법
+	// tuple 말고 dto를 사용하자 -> db 노출 위험
+	// jpql 사용해서 dto 반환받으려면 new 연산자 사용해야 함.
+	// 코드 지저분하고 생성자 방식만 지원
+	// but 쿼리 dsl은 프로퍼티, 필드 직접 접근, 생성자 사용 -> 3가지 지원
+	@Test
+	public void findDtoByJpql() {
+		List<MemberDto> resultList =
+				em.createQuery("select new com.example.querydsl.dto.MemberDto(m.username, m.age) " +
+						"from Member m", MemberDto.class).getResultList();
+
+		for (MemberDto memberDto : resultList) {
+			System.out.println("memberDto = " + memberDto);
+		}
+	}
+
+	// queryDsl 활용한 DTO 반환 방법
+
+	// 1. 프로퍼티(Setter) 활용해 DTO 반환받는 방법
+	// Projections의 bean() 메소드 호출해 매핑할 클래스와 매핑할 필드 순서대로 전달
+	@Test
+	public void findDtoBySetter() {
+		List<MemberDto> result = queryFactory
+				.select(Projections.bean(MemberDto.class,
+						member.username,
+						member.age))
+				.from(member)
+				.fetch();
+
+		for (MemberDto memberDto : result) {
+			System.out.println("!!!!! memberDto = " + memberDto);
+		}
+	}
+
+	// 2. 필드 직접 접근 방법
+	// bean 코드에서 fields()로 방식만 수정해주면 됨
+	// 생성자 방식도 constructor로만 바꾸면 됨
+	// fields()는 bean과 다르게 getter,setter 필요없고 결과는 동일
+	@Test
+	public void findDtoByField() {
+		List<MemberDto> result = queryFactory
+				.select(Projections.fields(MemberDto.class,
+//				.select(Projections.constructor(MemberDto.class,
+						member.username,
+						member.age))
+				.from(member)
+				.fetch();
+
+		for (MemberDto memberDto : result) {
+			System.out.println("!!!!! memberDto = " + memberDto);
+		}
+	}
+
+	// 필드명이 다른 DTO 사용해서 매핑해야 할 경우 (username // name)
+	// 엔티티와 dto 필드명 다를 때
+	@Test
+	public void findUserDto() {
+		List<UserDto> result = queryFactory
+				.select(Projections.fields(UserDto.class,
+						// 별칭 메서드 사용
+						member.username.as("name"),
+						member.age))
+				.from(member)
+				.fetch();
+
+		for (UserDto userDto : result) {
+			System.out.println("userDto = " + userDto);
+		}
+	}
+
+	/*
+	@QueryProjection 활용 하면 컴파일러로 타입 체크 가능
+	-> dto 생성자에 어노테이션 삽입해 사용
+	컴파일 단계에서 오류 찾기 가능 -> 가장 안전한 방법
+	but dto에 queryDsl 어노테이션 유지해야 한다는 점과 dto까지 Q파일 생성해야 한다는 단점 존재
+	 */
+	@Test
+	public void findByQueryProjection() {
+		List<MemberDto> result = queryFactory
+				.select(new QMemberDto(member.username, member.age))
+				.from(member)
+				.fetch();
+
+		for (MemberDto memberDto : result) {
+			System.out.println("!!!!! memberDto = " + memberDto);
+		}
+	}
 }
+
